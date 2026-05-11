@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light mode — warm cream base inspired by Indian crafts */
+    --background:   36 33% 98%;
+    --foreground:   20 14% 10%;
+    --card:         0 0% 100%;
+    --card-foreground: 20 14% 10%;
+    --popover:      0 0% 100%;
+    --popover-foreground: 20 14% 10%;
+
+    /* Primary = saffron-orange EA580C */
+    --primary:          22 96% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary = deep indigo */
+    --secondary:        241 49% 50%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted:         36 20% 95%;
+    --muted-foreground: 20 10% 45%;
+
+    --accent:        22 96% 97%;
+    --accent-foreground: 22 96% 30%;
+
+    --destructive:   0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border:        20 10% 90%;
+    --input:         20 10% 90%;
+    --ring:          22 96% 48%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background:   20 14% 8%;
+    --foreground:   36 33% 95%;
+    --card:         20 14% 11%;
+    --card-foreground: 36 33% 95%;
+    --popover:      20 14% 11%;
+    --popover-foreground: 36 33% 95%;
+    --primary:      22 96% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary:    241 49% 60%;
+    --secondary-foreground: 0 0% 100%;
+    --muted:        20 10% 18%;
+    --muted-foreground: 20 10% 60%;
+    --accent:       22 40% 18%;
+    --accent-foreground: 22 96% 70%;
+    --destructive:  0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border:       20 10% 20%;
+    --input:        20 10% 20%;
+    --ring:         22 96% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Smooth scrolling — but not for users who prefer reduced motion */
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+
+  /* Focus ring: visible only for keyboard navigation */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Remove default focus ring for mouse users */
+  :focus:not(:focus-visible) {
+    @apply outline-none;
+  }
+
+  /* Better tap targets on mobile */
+  button, [role="button"], a {
+    @apply touch-manipulation;
+  }
+}
+
+@layer utilities {
+  /* Skeleton loader shimmer */
+  .skeleton {
+    @apply animate-shimmer bg-[linear-gradient(90deg,hsl(var(--muted))_25%,hsl(var(--muted-foreground)/0.1)_50%,hsl(var(--muted))_75%)] bg-[length:200%_100%];
+  }
+
+  /* Price display: strikethrough MRP */
+  .price-mrp {
+    @apply line-through text-muted-foreground;
+  }
+
+  /* Trust badge pill */
+  .trust-badge {
+    @apply inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-600/20;
+  }
+
+  /* Rupee symbol sizing */
+  .rupee {
+    @apply font-sans;
+  }
+
+  /* Hide scrollbar but keep scrollable */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
