@@ -1,0 +1,27 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"main": "workers/entry.ts",
+	"name": "taj-mahal-express",
+	"compatibility_date": "2025-12-01",
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"services": [
+		{
+			// Self-reference service binding — lets the scheduled() handler below
+			// invoke this same Worker's /api/cron/* routes over HTTP.
+			// See https://opennext.js.org/cloudflare/caching
+			"binding": "WORKER_SELF_REFERENCE",
+			"service": "taj-mahal-express"
+		}
+	],
+	// Cloudflare Cron Triggers — replaces the Vercel `crons` entries in vercel.json.
+	// Schedules match vercel.json exactly; routing to the right /api/cron/* path
+	// happens in workers/entry.ts's scheduled() handler (CF crons have no
+	// built-in path concept, unlike Vercel).
+	"triggers": {
+		"crons": ["0 2 * * *", "0 3 * * *"]
+	}
+}

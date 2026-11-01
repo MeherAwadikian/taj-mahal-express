@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Plus, PenLine, Eye, EyeOff } from 'lucide-react'
+import { Plus, PenLine, Eye } from 'lucide-react'
 import { formatINR } from '@/lib/utils/currency'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,7 +10,7 @@ const STATUS_BADGE: Record<string, { label: string; variant: 'default' | 'second
   draft:          { label: 'Draft',           variant: 'secondary' },
   pending_review: { label: 'Under Review',    variant: 'outline' },
   paused:         { label: 'Paused',          variant: 'secondary' },
-  archived:       { label: 'Archived',        variant: 'destructive' },
+  rejected:       { label: 'Rejected',        variant: 'destructive' },
 }
 
 export default async function SellerProductsPage() {
@@ -28,11 +28,11 @@ export default async function SellerProductsPage() {
     ? await supabase
         .from('products')
         .select(`
-          id, slug, title, base_price, mrp, status, created_at, rating_avg, rating_count,
+          id, slug, title, base_price, mrp, status, created_at, average_rating, review_count,
           product_images(url, sort_order),
-          product_variants(id, quantity, reserved_quantity)
+          product_variants(id, inventory(quantity, reserved_quantity))
         `)
-        .eq('seller_profile_id', seller.id)
+        .eq('seller_id', seller.id)
         .order('created_at', { ascending: false })
     : { data: [] }
 
@@ -70,11 +70,10 @@ export default async function SellerProductsPage() {
             <tbody className="divide-y">
               {products.map((p) => {
                 const img    = p.product_images?.sort((a, b) => a.sort_order - b.sort_order)[0]
-                const stock  = (p.product_variants ?? []).reduce(
-                  (s: number, v: { quantity: number; reserved_quantity: number }) =>
-                    s + Math.max(0, (v.quantity ?? 0) - (v.reserved_quantity ?? 0)),
-                  0,
-                )
+                const stock  = (p.product_variants ?? []).reduce((s: number, v) => {
+                  const inv = Array.isArray(v.inventory) ? v.inventory[0] : v.inventory
+                  return s + Math.max(0, (inv?.quantity ?? 0) - (inv?.reserved_quantity ?? 0))
+                }, 0)
                 const status = STATUS_BADGE[p.status] ?? { label: p.status, variant: 'outline' as const }
 
                 return (

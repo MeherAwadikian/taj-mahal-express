@@ -11,19 +11,19 @@ type Stage = 'details' | 'otp'
 
 function OtpInput({ onComplete }: { onComplete: (otp: string) => void }) {
   const [digits, setDigits] = useState(['', '', '', '', '', ''])
-  const refs = Array.from({ length: 6 }, () => useRef<HTMLInputElement>(null))
+  const refs = useRef<(HTMLInputElement | null)[]>([])
 
   function handleChange(i: number, val: string) {
     if (!/^\d?$/.test(val)) return
     const next = [...digits]
     next[i] = val
     setDigits(next)
-    if (val && i < 5) refs[i + 1]?.current?.focus()
+    if (val && i < 5) refs.current[i + 1]?.focus()
     if (next.every((d) => d !== '')) onComplete(next.join(''))
   }
 
   function handleKeyDown(i: number, e: React.KeyboardEvent) {
-    if (e.key === 'Backspace' && !digits[i] && i > 0) refs[i - 1]?.current?.focus()
+    if (e.key === 'Backspace' && !digits[i] && i > 0) refs.current[i - 1]?.focus()
   }
 
   return (
@@ -31,7 +31,7 @@ function OtpInput({ onComplete }: { onComplete: (otp: string) => void }) {
       {digits.map((d, i) => (
         <input
           key={i}
-          ref={refs[i]}
+          ref={(el) => { refs.current[i] = el }}
           type="text"
           inputMode="numeric"
           maxLength={1}
@@ -86,7 +86,7 @@ export default function SignupPage() {
     }, 800)
   }
 
-  function handleOtpComplete(otp: string) {
+  function handleOtpComplete(_otp: string) {
     setLoading(true)
     setTimeout(() => {
       setLoading(false)

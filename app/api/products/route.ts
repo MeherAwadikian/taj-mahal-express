@@ -5,6 +5,7 @@ import { limiters, checkRateLimit } from '@/lib/rate-limit'
 import { productCreateSchema } from '@/lib/validation/product'
 import { requireSeller } from '@/lib/auth/require-role'
 import { paginationSchema } from '@/lib/validation/common'
+import { stripUndefined } from '@/lib/utils/object'
 
 const listQuerySchema = paginationSchema.extend({
   q:        z.string().max(200).optional(),
@@ -29,8 +30,8 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('products')
     .select(`
-      id, slug, title, base_price, mrp, rating_avg, rating_count, status,
-      seller_profiles!inner(display_name, is_verified),
+      id, slug, title, base_price, mrp, average_rating, review_count, status, is_cod_available,
+      seller_profiles!inner(display_name, kyc_status),
       product_images(url, sort_order)
     `, { count: 'exact' })
     .eq('status', 'active')
@@ -46,9 +47,9 @@ export async function GET(req: NextRequest) {
   switch (sort) {
     case 'price_asc':  query = query.order('base_price', { ascending: true }); break
     case 'price_desc': query = query.order('base_price', { ascending: false }); break
-    case 'rating':     query = query.order('rating_avg', { ascending: false }); break
+    case 'rating':     query = query.order('average_rating', { ascending: false }); break
     case 'newest':     query = query.order('created_at', { ascending: false }); break
-    default:           query = q ? query : query.order('rating_count', { ascending: false }); break
+    default:           query = q ? query : query.order('review_count', { ascending: false }); break
   }
 
   const { data, error, count } = await query
@@ -81,11 +82,11 @@ export async function POST(req: NextRequest) {
   // Verify seller profile exists
   const { data: seller } = await supabase
     .from('seller_profiles')
-    .select('id, status')
+    .select('id, is_active')
     .eq('user_id', auth.user.id)
     .single()
 
-  if (!seller || seller.status !== 'active') {
+  if (!seller || !seller.is_active) {
     return NextResponse.json({ error: 'Seller account not active' }, { status: 403 })
   }
 
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
 
   const { data: product, error } = await supabase
     .from('products')
-    .insert({ ...productData, slug, seller_profile_id: seller.id, status: 'pending_review' })
+    .insert({ ...stripUndefined(productData), slug, seller_id: seller.id, status: 'pending_review' })
     .select('id, slug')
     .single()
 

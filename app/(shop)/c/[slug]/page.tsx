@@ -1,29 +1,50 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { SlidersHorizontal, ChevronDown, X } from 'lucide-react'
 import { ProductCard, type ProductCardData } from '@/components/product/product-card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils/cn'
+import { createClient } from '@/lib/supabase/client'
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+const FREE_SHIP_THRESHOLD = 499
+const PLACEHOLDER_IMAGE   = 'https://placehold.co/400x400/e5e7eb/9ca3af?text=No+Image'
 
-const MOCK_PRODUCTS: ProductCardData[] = Array.from({ length: 24 }, (_, i) => ({
-  id:          String(i + 1),
-  slug:        `product-${i + 1}`,
-  title:       ['Samsung Galaxy F55 5G 8GB', 'boAt Airdopes 141 TWS Earbuds', 'Puma Men Running Shoes', 'Himalaya Neem Face Wash 150ml', 'Prestige Mixer Grinder 750W', 'Lakme Absolute Foundation SPF8', 'Wildcraft 30L Backpack', 'Atomic Habits Paperback', 'Philips Beard Trimmer BT3231', 'Kanjivaram Silk Saree'][i % 10] + (i >= 10 ? ` v${Math.ceil((i + 1) / 10)}` : ''),
-  imageUrl:    `https://placehold.co/400x400/${['3b82f6','f97316','10b981','6366f1','f43f5e','8b5cf6','ec4899','f59e0b','0ea5e9','22c55e'][i % 10]}/white?text=P${i + 1}`,
-  price:       [26999, 999, 2799, 149, 2799, 549, 1299, 299, 799, 4499][i % 10],
-  mrp:         [30999, 3990, 4999, 175, 4999, 999, 2499, 499, 1495, 8999][i % 10],
-  rating:      3.5 + (i % 15) * 0.1,
-  reviewCount: (i + 1) * 123,
-  sellerName:  ['Samsung Official', 'boAt Store', 'Puma India', 'Himalaya Direct', 'Prestige', 'Lakmé', 'Wildcraft', 'BookWala', 'Philips India', 'Silk House'][i % 10],
-  isCod:       i % 3 !== 0,
-  isFreeShip:  i % 2 === 0,
-  isVerified:  i % 5 !== 4,
-  badge:       i % 7 === 0 ? 'Best Seller' : i % 11 === 0 ? 'New' : undefined,
-}))
+async function fetchProductsByCategorySlug(slug: string): Promise<ProductCardData[]> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('products')
+    .select(`
+      id, slug, title, base_price, mrp, average_rating, review_count, is_cod_available,
+      seller_profiles!inner(display_name, kyc_status),
+      product_images(url, sort_order, is_primary),
+      categories!inner(slug)
+    `)
+    .eq('status', 'active')
+    .eq('categories.slug', slug)
+    .limit(60)
+
+  return (data ?? []).map((row) => {
+    const seller  = Array.isArray(row.seller_profiles) ? row.seller_profiles[0] : row.seller_profiles
+    const images  = row.product_images ?? []
+    const primary = images.find((i) => i.is_primary) ?? [...images].sort((a, b) => a.sort_order - b.sort_order)[0]
+    return {
+      id:          row.id,
+      slug:        row.slug,
+      title:       row.title,
+      imageUrl:    primary?.url ?? PLACEHOLDER_IMAGE,
+      price:       Number(row.base_price),
+      mrp:         Number(row.mrp),
+      rating:      Number(row.average_rating ?? 0),
+      reviewCount: row.review_count ?? 0,
+      sellerName:  seller?.display_name ?? 'Marketplace Seller',
+      isCod:       row.is_cod_available,
+      isFreeShip:  Number(row.base_price) >= FREE_SHIP_THRESHOLD,
+      isVerified:  seller?.kyc_status === 'approved',
+    } satisfies ProductCardData
+  })
+}
 
 const SORT_OPTIONS = [
   { label: 'Relevance',         value: 'relevance' },
@@ -66,7 +87,19 @@ function FilterSection({ title, children }: { title: string; children: React.Rea
 
 export default function PLPPage() {
   const params = useParams()
-  const slug   = Array.isArray(params.slug) ? params.slug[0] : (params.slug ?? '')
+  const slug   = (Array.isArray(params.slug) ? params.slug[0] : params.slug) ?? ''
+
+  const [allProducts, setAllProducts] = useState<ProductCardData[]>([])
+  const [loading,     setLoading]     = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    fetchProductsByCategorySlug(slug)
+      .then((products) => { if (!cancelled) setAllProducts(products) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [slug])
 
   const [sort,        setSort]        = useState('relevance')
   const [priceRange,  setPriceRange]  = useState<number | null>(null)
@@ -85,7 +118,7 @@ export default function PLPPage() {
     .join(' ')
 
   // Filter
-  let filtered = MOCK_PRODUCTS
+  let filtered = allProducts
   if (priceRange !== null) {
     const range = PRICE_RANGES[priceRange]
     if (range) filtered = filtered.filter((p) => p.price >= range.min && p.price <= range.max)
@@ -219,11 +252,17 @@ export default function PLPPage() {
           </div>
 
           {/* Grid */}
-          {paginated.length === 0 ? (
+          {loading ? (
+            <p className="py-20 text-center text-sm text-muted-foreground">Loading products…</p>
+          ) : paginated.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-20 text-center">
               <p className="text-lg font-semibold">No products found</p>
-              <p className="text-sm text-muted-foreground">Try adjusting your filters</p>
-              <Button variant="outline" onClick={clearAll}>Clear filters</Button>
+              <p className="text-sm text-muted-foreground">
+                {allProducts.length === 0 ? 'This category has no products yet' : 'Try adjusting your filters'}
+              </p>
+              {allProducts.length > 0 && (
+                <Button variant="outline" onClick={clearAll}>Clear filters</Button>
+              )}
             </div>
           ) : (
             <>

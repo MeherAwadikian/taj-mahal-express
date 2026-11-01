@@ -2,13 +2,11 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Search, ShoppingCart, Heart, User, Menu, ChevronDown } from 'lucide-react'
+import { Search, ShoppingCart, Heart, User, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils/cn'
 import { useCartStore } from '@/lib/store/cart'
-import { useState, useRef, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 
 export function Header() {
   const router = useRouter()
@@ -89,9 +87,9 @@ export function Header() {
             size="icon"
             className="md:hidden"
             onClick={() => setMobileMenuOpen(v => !v)}
-            aria-label="Open menu"
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
           >
-            <Menu className="h-5 w-5" />
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
         </div>
       </div>
@@ -111,6 +109,40 @@ export function Header() {
           </Button>
         </form>
       </div>
+
+      {/* Mobile menu drawer */}
+      {mobileMenuOpen && (
+        <div className="border-t px-4 py-3 md:hidden">
+          <nav className="flex flex-col gap-1" aria-label="Categories">
+            {NAV_CATEGORIES.map(cat => (
+              <Link
+                key={cat.href}
+                href={cat.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="rounded-lg px-2 py-2 text-sm font-medium text-foreground hover:bg-muted"
+              >
+                {cat.label}
+              </Link>
+            ))}
+          </nav>
+          <div className="mt-2 flex flex-col gap-1 border-t pt-2">
+            <Link
+              href="/account/wishlist"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-foreground hover:bg-muted"
+            >
+              <Heart className="h-4 w-4" /> Wishlist
+            </Link>
+            <Link
+              href="/account"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-foreground hover:bg-muted"
+            >
+              <User className="h-4 w-4" /> My Account
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Category nav — desktop */}
       <nav className="hidden border-t md:block" aria-label="Categories">

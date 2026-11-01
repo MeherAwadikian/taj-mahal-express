@@ -31,38 +31,39 @@ export async function POST(req: NextRequest) {
       const payment = (event.payload?.payment as { entity?: Record<string, unknown> })?.entity
       if (!payment) break
 
-      const razorpayOrderId  = payment.order_id  as string
+      const razorpayOrderId   = payment.order_id as string
       const razorpayPaymentId = payment.id        as string
 
-      // Idempotency — skip if already processed
-      const { data: order } = await supabase
-        .from('orders')
-        .select('id, status, payment_status')
+      // razorpay_order_id lives on `payments`, one row per order
+      const { data: paymentRow } = await supabase
+        .from('payments')
+        .select('id, order_id, status')
         .eq('razorpay_order_id', razorpayOrderId)
         .single()
 
-      if (!order) break
-      if (order.payment_status === 'paid') break  // already handled
+      if (!paymentRow) break
+      if (paymentRow.status === 'captured') break  // already handled (idempotency)
 
       await supabase
-        .from('orders')
+        .from('payments')
         .update({
-          status:               'confirmed',
-          payment_status:       'paid',
-          razorpay_payment_id:  razorpayPaymentId,
-          paid_at:              new Date().toISOString(),
+          razorpay_payment_id: razorpayPaymentId,
+          status:              'captured',
+          captured_at:         new Date().toISOString(),
         })
-        .eq('id', order.id)
+        .eq('id', paymentRow.id)
 
-      // Clear the buyer's cart (best-effort)
-      const { data: orderRow } = await supabase
+      const { data: order } = await supabase
         .from('orders')
-        .select('buyer_id')
-        .eq('id', order.id)
+        .update({ status: 'confirmed', payment_status: 'paid' })
+        .eq('id', paymentRow.order_id)
+        .select('id, buyer_id')
         .single()
 
-      if (orderRow?.buyer_id) {
-        await supabase.from('cart_items').delete().eq('user_id', orderRow.buyer_id)
+      // Clear the buyer's cart (best-effort)
+      if (order?.buyer_id) {
+        const { data: cart } = await supabase.from('carts').select('id').eq('user_id', order.buyer_id).maybeSingle()
+        if (cart) await supabase.from('cart_items').delete().eq('cart_id', cart.id)
       }
 
       break
@@ -74,11 +75,20 @@ export async function POST(req: NextRequest) {
 
       const razorpayOrderId = payment.order_id as string
 
-      // Release reserved inventory and mark order as payment_failed
+      const { data: paymentRow } = await supabase
+        .from('payments')
+        .select('id, order_id, status')
+        .eq('razorpay_order_id', razorpayOrderId)
+        .single()
+
+      if (!paymentRow || paymentRow.status === 'captured') break
+
+      await supabase.from('payments').update({ status: 'failed' }).eq('id', paymentRow.id)
+
       const { data: order } = await supabase
         .from('orders')
         .select('id, payment_status')
-        .eq('razorpay_order_id', razorpayOrderId)
+        .eq('id', paymentRow.order_id)
         .single()
 
       if (!order || order.payment_status !== 'pending') break
@@ -88,8 +98,13 @@ export async function POST(req: NextRequest) {
         .update({ payment_status: 'failed', status: 'cancelled' })
         .eq('id', order.id)
 
-      // Release reserved inventory via update_inventory_on_order DB function
-      // The trigger handles this automatically when status changes to 'cancelled'
+      // Cancelling order_items (not just the parent order) is what fires the
+      // DB's inventory trigger, releasing the reserved stock.
+      await supabase
+        .from('order_items')
+        .update({ item_status: 'cancelled' })
+        .eq('order_id', order.id)
+        .not('item_status', 'in', '(cancelled,delivered,returned)')
 
       break
     }
@@ -100,10 +115,16 @@ export async function POST(req: NextRequest) {
 
       const razorpayPaymentId = refund.payment_id as string
 
-      await supabase
-        .from('orders')
-        .update({ payment_status: 'refunded' })
+      const { data: paymentRow } = await supabase
+        .from('payments')
+        .update({ status: 'refunded' })
         .eq('razorpay_payment_id', razorpayPaymentId)
+        .select('order_id')
+        .single()
+
+      if (paymentRow) {
+        await supabase.from('orders').update({ payment_status: 'refunded' }).eq('id', paymentRow.order_id)
+      }
 
       break
     }

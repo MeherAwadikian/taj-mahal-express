@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { Trash2, Minus, Plus, Tag, ShieldCheck, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatINR, discountPercent } from '@/lib/utils/currency'
-import { cn } from '@/lib/utils/cn'
 
 // ─── Mock cart ────────────────────────────────────────────────────────────────
 

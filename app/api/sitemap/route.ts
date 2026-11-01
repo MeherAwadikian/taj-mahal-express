@@ -5,7 +5,9 @@ export async function GET() {
   const supabase = await createClient()
   const base     = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taj-mahal-express.in'
 
-  const staticRoutes = [
+  interface SitemapRoute { loc: string; priority: string; changefreq: string; lastmod?: string }
+
+  const staticRoutes: SitemapRoute[] = [
     { loc: base,                priority: '1.0', changefreq: 'daily' },
     { loc: `${base}/deals`,     priority: '0.9', changefreq: 'hourly' },
     { loc: `${base}/seller/register`, priority: '0.7', changefreq: 'monthly' },
@@ -14,7 +16,7 @@ export async function GET() {
   const categories = [
     'electronics', 'fashion', 'home-kitchen', 'beauty', 'sports', 'grocery', 'books', 'toys',
   ]
-  const catRoutes = categories.map((slug) => ({
+  const catRoutes: SitemapRoute[] = categories.map((slug) => ({
     loc: `${base}/c/${slug}`, priority: '0.8', changefreq: 'daily',
   }))
 
@@ -25,9 +27,9 @@ export async function GET() {
     .order('updated_at', { ascending: false })
     .limit(5000)
 
-  const productRoutes = (products ?? []).map((p) => ({
+  const productRoutes: SitemapRoute[] = (products ?? []).map((p) => ({
     loc:        `${base}/p/${p.slug}`,
-    lastmod:    new Date(p.updated_at).toISOString().split('T')[0],
+    lastmod:    new Date(p.updated_at).toISOString().split('T')[0]!,
     priority:   '0.6',
     changefreq: 'weekly',
   }))

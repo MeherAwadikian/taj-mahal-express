@@ -26,13 +26,11 @@ export default async function SellerOrdersPage() {
     ? await supabase
         .from('order_items')
         .select(`
-          id, quantity, unit_price, status, created_at,
-          orders(order_number, buyer_id, shipping_address_id),
-          product_variants(title,
-            products(title, slug)
-          )
+          id, quantity, unit_price, item_status, created_at,
+          product_title, variant_title,
+          orders(order_number)
         `)
-        .eq('seller_profile_id', seller.id)
+        .eq('seller_id', seller.id)
         .order('created_at', { ascending: false })
         .limit(50)
     : { data: [] }
@@ -60,10 +58,9 @@ export default async function SellerOrdersPage() {
             </thead>
             <tbody className="divide-y">
               {items.map((item) => {
-                const order   = item.orders as unknown as { order_number: string }
-                const variant = item.product_variants as unknown as { title: string; products: { title: string; slug: string } }
-                const status  = STATUS_BADGE[item.status] ?? { label: item.status, variant: 'outline' as const }
-                const date    = new Date(item.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                const order  = Array.isArray(item.orders) ? item.orders[0] : item.orders
+                const status = STATUS_BADGE[item.item_status] ?? { label: item.item_status, variant: 'outline' as const }
+                const date   = new Date(item.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 
                 return (
                   <tr key={item.id} className="hover:bg-muted/30 transition-colors">
@@ -71,8 +68,8 @@ export default async function SellerOrdersPage() {
                       #{order?.order_number ?? '—'}
                     </td>
                     <td className="hidden px-4 py-3 sm:table-cell">
-                      <p className="line-clamp-1 max-w-[200px]">{variant?.products?.title}</p>
-                      <p className="text-xs text-muted-foreground">{variant?.title} × {item.quantity}</p>
+                      <p className="line-clamp-1 max-w-[200px]">{item.product_title}</p>
+                      <p className="text-xs text-muted-foreground">{item.variant_title} × {item.quantity}</p>
                     </td>
                     <td className="hidden px-4 py-3 font-medium md:table-cell">
                       {formatINR(item.unit_price * item.quantity)}

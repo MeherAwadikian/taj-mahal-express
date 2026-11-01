@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import type { Json } from '@/types/supabase'
 
 interface AuditParams {
   actorId:     string
@@ -25,8 +26,8 @@ export async function auditLog(params: AuditParams): Promise<void> {
     action:       params.action,
     target_type:  params.targetType,
     target_id:    params.targetId ?? null,
-    before_state: params.beforeState ?? null,
-    after_state:  params.afterState ?? null,
+    before_state: (params.beforeState as Json) ?? null,
+    after_state:  (params.afterState as Json) ?? null,
     ip_address:   ip,
     user_agent:   params.req.headers.get('user-agent'),
   })

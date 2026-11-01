@@ -18,7 +18,7 @@ export const productVariantSchema = z.object({
   path: ['price'],
 })
 
-export const productCreateSchema = z.object({
+const productObjectSchema = z.object({
   title:             z.string().min(10, 'Title must be at least 10 characters').max(200),
   slug:              slugSchema.optional(),
   description:       z.string().min(20, 'Provide at least a 20-character description').max(5000).optional(),
@@ -38,12 +38,14 @@ export const productCreateSchema = z.object({
   specifications:    z.record(z.string(), z.string()).optional().default({}),
   weight_grams:      z.number().int().positive().optional(),
   variants:          z.array(productVariantSchema).min(1, 'At least one variant is required'),
-}).refine(d => d.base_price <= d.mrp, {
+})
+
+export const productCreateSchema = productObjectSchema.refine(d => d.base_price <= d.mrp, {
   message: 'Sale price cannot exceed MRP',
   path: ['base_price'],
 })
 
-export const productUpdateSchema = productCreateSchema.partial().omit({ variants: true })
+export const productUpdateSchema = productObjectSchema.partial().omit({ variants: true })
 
 export const productStatusSchema = z.object({
   status: z.enum(['draft', 'pending_review', 'active', 'paused']),

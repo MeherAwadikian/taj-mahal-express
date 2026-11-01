@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { productUpdateSchema } from '@/lib/validation/product'
 import { requireSeller } from '@/lib/auth/require-role'
+import { stripUndefined } from '@/lib/utils/object'
 
 // GET /api/products/[slug]
 export async function GET(
@@ -15,11 +16,12 @@ export async function GET(
     .select(`
       *,
       seller_profiles(
-        id, display_name, is_verified, rating_avg, rating_count
+        id, display_name, kyc_status, total_rating, total_reviews
       ),
       product_images(id, url, alt_text, sort_order),
       product_variants(
-        id, title, sku, options, price, mrp, quantity, reserved_quantity, is_active, sort_order
+        id, title, sku, options, price, mrp, is_active, sort_order,
+        inventory(quantity, reserved_quantity)
       ),
       categories(id, name, slug, parent_id)
     `)
@@ -31,13 +33,16 @@ export async function GET(
     return NextResponse.json({ error: 'Product not found' }, { status: 404 })
   }
 
-  // Available stock
+  // Available stock (inventory is a 1:1 join, returned as an array by PostgREST)
   const productWithStock = {
     ...data,
-    product_variants: data.product_variants?.map((v) => ({
-      ...v,
-      available_qty: Math.max(0, (v.quantity ?? 0) - (v.reserved_quantity ?? 0)),
-    })),
+    product_variants: data.product_variants?.map((v) => {
+      const inv = Array.isArray(v.inventory) ? v.inventory[0] : v.inventory
+      return {
+        ...v,
+        available_qty: Math.max(0, (inv?.quantity ?? 0) - (inv?.reserved_quantity ?? 0)),
+      }
+    }),
   }
 
   return NextResponse.json({ data: productWithStock })
@@ -78,7 +83,7 @@ export async function PATCH(
 
   const { data: updated, error } = await supabase
     .from('products')
-    .update(parsed.data)
+    .update(stripUndefined(parsed.data))
     .eq('id', product.id)
     .select('id, slug, status')
     .single()
@@ -116,7 +121,9 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  await supabase.from('products').update({ status: 'archived' }).eq('id', product.id)
+  // Schema's products.status CHECK constraint has no 'archived' value — 'paused' is the closest
+  // equivalent (seller-initiated removal from listings without deleting order history references).
+  await supabase.from('products').update({ status: 'paused' }).eq('id', product.id)
 
   return new NextResponse(null, { status: 204 })
 }

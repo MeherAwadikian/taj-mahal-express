@@ -5,7 +5,9 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
+  __InternalSupabase: { PostgrestVersion: '12' }
   public: {
+    Views: Record<string, never>
     Tables: {
       users: {
         Row: {
@@ -16,6 +18,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['users']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['users']['Insert']>
+        Relationships: []
       }
       seller_profiles: {
         Row: {
@@ -33,6 +36,96 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['seller_profiles']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['seller_profiles']['Insert']>
+        Relationships: [{"foreignKeyName":"seller_profiles_user_id_fkey","columns":["user_id"],"isOneToOne":false,"referencedRelation":"users","referencedColumns":["id"]}]
+      }
+      addresses: {
+        Row: {
+          id: string; user_id: string; label: string | null
+          full_name: string; phone: string
+          address_line1: string; address_line2: string | null
+          city: string; state: string; pincode: string; country: string
+          is_default: boolean; latitude: number | null; longitude: number | null
+          created_at: string; updated_at: string; deleted_at: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['addresses']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['addresses']['Insert']>
+        Relationships: [{"foreignKeyName":"addresses_user_id_fkey","columns":["user_id"],"isOneToOne":false,"referencedRelation":"users","referencedColumns":["id"]}]
+      }
+      coupons: {
+        Row: {
+          id: string; code: string; description: string | null
+          type: 'flat' | 'percent'; value: number; max_discount: number | null
+          min_order_value: number; category_id: string | null; seller_id: string | null
+          max_uses: number | null; max_uses_per_user: number; current_uses: number
+          is_active: boolean; starts_at: string; expires_at: string | null
+          created_by: string; created_at: string; updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['coupons']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['coupons']['Insert']>
+        Relationships: [{"foreignKeyName":"coupons_category_id_fkey","columns":["category_id"],"isOneToOne":false,"referencedRelation":"categories","referencedColumns":["id"]},{"foreignKeyName":"fk_coupons_seller","columns":["seller_id"],"isOneToOne":false,"referencedRelation":"seller_profiles","referencedColumns":["id"]}]
+      }
+      carts: {
+        Row: {
+          id: string; user_id: string | null; session_id: string | null
+          expires_at: string | null; created_at: string; updated_at: string
+        }
+        Insert: Partial<Omit<Database['public']['Tables']['carts']['Row'], 'id' | 'created_at' | 'updated_at'>>
+        Update: Partial<Database['public']['Tables']['carts']['Insert']>
+        Relationships: [{"foreignKeyName":"carts_user_id_fkey","columns":["user_id"],"isOneToOne":false,"referencedRelation":"users","referencedColumns":["id"]}]
+      }
+      cart_items: {
+        Row: {
+          id: string; cart_id: string; product_id: string; variant_id: string
+          quantity: number; price_snapshot: number
+          created_at: string; updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['cart_items']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['cart_items']['Insert']>
+        Relationships: [{"foreignKeyName":"cart_items_cart_id_fkey","columns":["cart_id"],"isOneToOne":false,"referencedRelation":"carts","referencedColumns":["id"]},{"foreignKeyName":"cart_items_product_id_fkey","columns":["product_id"],"isOneToOne":false,"referencedRelation":"products","referencedColumns":["id"]},{"foreignKeyName":"cart_items_variant_id_fkey","columns":["variant_id"],"isOneToOne":false,"referencedRelation":"product_variants","referencedColumns":["id"]}]
+      }
+      coupon_redemptions: {
+        Row: {
+          id: string; coupon_id: string; user_id: string; order_id: string
+          discount_amount: number; created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['coupon_redemptions']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['coupon_redemptions']['Insert']>
+        Relationships: [{"foreignKeyName":"coupon_redemptions_coupon_id_fkey","columns":["coupon_id"],"isOneToOne":false,"referencedRelation":"coupons","referencedColumns":["id"]},{"foreignKeyName":"coupon_redemptions_user_id_fkey","columns":["user_id"],"isOneToOne":false,"referencedRelation":"users","referencedColumns":["id"]},{"foreignKeyName":"coupon_redemptions_order_id_fkey","columns":["order_id"],"isOneToOne":false,"referencedRelation":"orders","referencedColumns":["id"]}]
+      }
+      seller_payouts: {
+        Row: {
+          id: string; seller_id: string; period_start: string; period_end: string
+          gross_amount: number; commission_deducted: number; refunds_deducted: number
+          tds_deducted: number; net_amount: number
+          status: 'pending' | 'processing' | 'paid' | 'failed' | 'on_hold'
+          bank_reference: string | null; paid_at: string | null
+          razorpay_payout_id: string | null
+          created_at: string; updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['seller_payouts']['Row'], 'id' | 'created_at' | 'updated_at' | 'refunds_deducted' | 'tds_deducted' | 'bank_reference' | 'paid_at' | 'razorpay_payout_id'>
+          & Partial<Pick<Database['public']['Tables']['seller_payouts']['Row'], 'refunds_deducted' | 'tds_deducted' | 'bank_reference' | 'paid_at' | 'razorpay_payout_id'>>
+        Update: Partial<Database['public']['Tables']['seller_payouts']['Insert']>
+        Relationships: [{"foreignKeyName":"seller_payouts_seller_id_fkey","columns":["seller_id"],"isOneToOne":false,"referencedRelation":"seller_profiles","referencedColumns":["id"]}]
+      }
+      payout_line_items: {
+        Row: {
+          id: string; payout_id: string; order_item_id: string; order_number: string
+          gross_amount: number; commission_rate: number; commission_amount: number
+          refund_deduction: number; net_amount: number; settled_at: string; created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['payout_line_items']['Row'], 'id' | 'created_at' | 'refund_deduction'> & { refund_deduction?: number }
+        Update: Partial<Database['public']['Tables']['payout_line_items']['Insert']>
+        Relationships: [{"foreignKeyName":"payout_line_items_payout_id_fkey","columns":["payout_id"],"isOneToOne":false,"referencedRelation":"seller_payouts","referencedColumns":["id"]},{"foreignKeyName":"payout_line_items_order_item_id_fkey","columns":["order_item_id"],"isOneToOne":false,"referencedRelation":"order_items","referencedColumns":["id"]}]
+      }
+      admin_logs: {
+        Row: {
+          id: string; actor_id: string; action: string; target_type: string
+          target_id: string | null; before_state: Json | null; after_state: Json | null
+          ip_address: string | null; user_agent: string | null; created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['admin_logs']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['admin_logs']['Insert']>
+        Relationships: [{"foreignKeyName":"admin_logs_actor_id_fkey","columns":["actor_id"],"isOneToOne":false,"referencedRelation":"users","referencedColumns":["id"]}]
       }
       categories: {
         Row: {
@@ -44,6 +137,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['categories']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['categories']['Insert']>
+        Relationships: [{"foreignKeyName":"categories_parent_id_fkey","columns":["parent_id"],"isOneToOne":false,"referencedRelation":"categories","referencedColumns":["id"]}]
       }
       products: {
         Row: {
@@ -61,8 +155,23 @@ export type Database = {
           view_count: number; search_vector: unknown
           created_at: string; updated_at: string; deleted_at: string | null
         }
-        Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at' | 'search_vector'>
+        Insert: Omit<Database['public']['Tables']['products']['Row'],
+            'id' | 'created_at' | 'updated_at' | 'search_vector'
+            | 'description' | 'brand' | 'specifications' | 'tags' | 'rejection_reason'
+            | 'min_order_qty' | 'max_order_qty' | 'is_cod_available' | 'return_policy_days'
+            | 'warranty_info' | 'country_of_origin' | 'hsn_code' | 'gst_rate'
+            | 'weight_grams' | 'length_cm' | 'width_cm' | 'height_cm'
+            | 'total_sold' | 'average_rating' | 'review_count' | 'view_count' | 'deleted_at'
+          >
+          & Partial<Pick<Database['public']['Tables']['products']['Row'],
+            'description' | 'brand' | 'specifications' | 'tags' | 'rejection_reason'
+            | 'min_order_qty' | 'max_order_qty' | 'is_cod_available' | 'return_policy_days'
+            | 'warranty_info' | 'country_of_origin' | 'hsn_code' | 'gst_rate'
+            | 'weight_grams' | 'length_cm' | 'width_cm' | 'height_cm'
+            | 'total_sold' | 'average_rating' | 'review_count' | 'view_count' | 'deleted_at'
+          >>
         Update: Partial<Database['public']['Tables']['products']['Insert']>
+        Relationships: [{"foreignKeyName":"products_seller_id_fkey","columns":["seller_id"],"isOneToOne":false,"referencedRelation":"seller_profiles","referencedColumns":["id"]},{"foreignKeyName":"products_category_id_fkey","columns":["category_id"],"isOneToOne":false,"referencedRelation":"categories","referencedColumns":["id"]}]
       }
       product_variants: {
         Row: {
@@ -73,6 +182,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['product_variants']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['product_variants']['Insert']>
+        Relationships: [{"foreignKeyName":"product_variants_product_id_fkey","columns":["product_id"],"isOneToOne":false,"referencedRelation":"products","referencedColumns":["id"]}]
       }
       product_images: {
         Row: {
@@ -82,6 +192,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['product_images']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['product_images']['Insert']>
+        Relationships: [{"foreignKeyName":"product_images_product_id_fkey","columns":["product_id"],"isOneToOne":false,"referencedRelation":"products","referencedColumns":["id"]},{"foreignKeyName":"product_images_variant_id_fkey","columns":["variant_id"],"isOneToOne":false,"referencedRelation":"product_variants","referencedColumns":["id"]}]
       }
       inventory: {
         Row: {
@@ -91,6 +202,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['inventory']['Row'], 'id' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['inventory']['Insert']>
+        Relationships: [{"foreignKeyName":"inventory_variant_id_fkey","columns":["variant_id"],"isOneToOne":true,"referencedRelation":"product_variants","referencedColumns":["id"]}]
       }
       orders: {
         Row: {
@@ -106,8 +218,10 @@ export type Database = {
           notes: string | null; ip_address: string | null; user_agent: string | null
           created_at: string; updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['orders']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<Database['public']['Tables']['orders']['Row'], 'id' | 'created_at' | 'updated_at' | 'ip_address' | 'user_agent'>
+          & Partial<Pick<Database['public']['Tables']['orders']['Row'], 'ip_address' | 'user_agent'>>
         Update: Partial<Database['public']['Tables']['orders']['Insert']>
+        Relationships: [{"foreignKeyName":"orders_buyer_id_fkey","columns":["buyer_id"],"isOneToOne":false,"referencedRelation":"users","referencedColumns":["id"]},{"foreignKeyName":"orders_shipping_address_id_fkey","columns":["shipping_address_id"],"isOneToOne":false,"referencedRelation":"addresses","referencedColumns":["id"]},{"foreignKeyName":"orders_coupon_id_fkey","columns":["coupon_id"],"isOneToOne":false,"referencedRelation":"coupons","referencedColumns":["id"]}]
       }
       order_items: {
         Row: {
@@ -123,6 +237,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['order_items']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['order_items']['Insert']>
+        Relationships: [{"foreignKeyName":"order_items_order_id_fkey","columns":["order_id"],"isOneToOne":false,"referencedRelation":"orders","referencedColumns":["id"]},{"foreignKeyName":"order_items_seller_id_fkey","columns":["seller_id"],"isOneToOne":false,"referencedRelation":"seller_profiles","referencedColumns":["id"]},{"foreignKeyName":"order_items_product_id_fkey","columns":["product_id"],"isOneToOne":false,"referencedRelation":"products","referencedColumns":["id"]},{"foreignKeyName":"order_items_variant_id_fkey","columns":["variant_id"],"isOneToOne":false,"referencedRelation":"product_variants","referencedColumns":["id"]}]
       }
       payments: {
         Row: {
@@ -133,8 +248,10 @@ export type Database = {
           gateway_response: Json; idempotency_key: string
           captured_at: string | null; created_at: string; updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['payments']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<Database['public']['Tables']['payments']['Row'], 'id' | 'created_at' | 'updated_at' | 'razorpay_payment_id' | 'razorpay_signature' | 'method' | 'gateway_response' | 'captured_at'>
+          & Partial<Pick<Database['public']['Tables']['payments']['Row'], 'razorpay_payment_id' | 'razorpay_signature' | 'method' | 'gateway_response' | 'captured_at'>>
         Update: Partial<Database['public']['Tables']['payments']['Insert']>
+        Relationships: [{"foreignKeyName":"payments_order_id_fkey","columns":["order_id"],"isOneToOne":false,"referencedRelation":"orders","referencedColumns":["id"]}]
       }
       reviews: {
         Row: {
@@ -148,6 +265,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['reviews']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['reviews']['Insert']>
+        Relationships: [{"foreignKeyName":"reviews_product_id_fkey","columns":["product_id"],"isOneToOne":false,"referencedRelation":"products","referencedColumns":["id"]},{"foreignKeyName":"reviews_order_item_id_fkey","columns":["order_item_id"],"isOneToOne":true,"referencedRelation":"order_items","referencedColumns":["id"]},{"foreignKeyName":"reviews_buyer_id_fkey","columns":["buyer_id"],"isOneToOne":false,"referencedRelation":"users","referencedColumns":["id"]},{"foreignKeyName":"reviews_seller_id_fkey","columns":["seller_id"],"isOneToOne":false,"referencedRelation":"seller_profiles","referencedColumns":["id"]}]
       }
       disputes: {
         Row: {
@@ -160,6 +278,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['disputes']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['disputes']['Insert']>
+        Relationships: [{"foreignKeyName":"disputes_order_item_id_fkey","columns":["order_item_id"],"isOneToOne":false,"referencedRelation":"order_items","referencedColumns":["id"]},{"foreignKeyName":"disputes_buyer_id_fkey","columns":["buyer_id"],"isOneToOne":false,"referencedRelation":"users","referencedColumns":["id"]},{"foreignKeyName":"disputes_seller_id_fkey","columns":["seller_id"],"isOneToOne":false,"referencedRelation":"seller_profiles","referencedColumns":["id"]}]
       }
       notifications: {
         Row: {
@@ -170,6 +289,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['notifications']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['notifications']['Insert']>
+        Relationships: [{"foreignKeyName":"notifications_user_id_fkey","columns":["user_id"],"isOneToOne":false,"referencedRelation":"users","referencedColumns":["id"]}]
       }
     }
     Functions: {
@@ -179,6 +299,8 @@ export type Database = {
       is_admin:               { Args: Record<never, never>; Returns: boolean }
       get_seller_profile_id:  { Args: Record<never, never>; Returns: string }
     }
+    Enums: Record<string, never>
+    CompositeTypes: Record<string, never>
   }
 }
 

@@ -18,8 +18,12 @@ export async function POST(
     return NextResponse.json({ error: 'Missing payment details' }, { status: 422 })
   }
 
+  const secret = process.env.RAZORPAY_KEY_SECRET
+  if (!secret) {
+    return NextResponse.json({ error: 'Payment verification is not configured' }, { status: 503 })
+  }
+
   // Verify signature — HMAC-SHA256(razorpay_order_id + '|' + razorpay_payment_id)
-  const secret   = process.env.RAZORPAY_KEY_SECRET!
   const message  = `${razorpay_order_id}|${razorpay_payment_id}`
   const expected = crypto.createHmac('sha256', secret).update(message).digest('hex')
 
@@ -30,10 +34,10 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid payment signature' }, { status: 400 })
   }
 
-  // Verify order belongs to this user and is pending
+  // Verify order belongs to this user
   const { data: order } = await supabase
     .from('orders')
-    .select('id, buyer_id, status, payment_status, razorpay_order_id')
+    .select('id, buyer_id, status, payment_status')
     .eq('id', params.id)
     .single()
 
@@ -41,7 +45,14 @@ export async function POST(
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   }
 
-  if (order.razorpay_order_id !== razorpay_order_id) {
+  // razorpay_order_id lives on the payments table, one row per order
+  const { data: payment } = await supabase
+    .from('payments')
+    .select('id, razorpay_order_id, status')
+    .eq('order_id', order.id)
+    .single()
+
+  if (!payment || payment.razorpay_order_id !== razorpay_order_id) {
     return NextResponse.json({ error: 'Order ID mismatch' }, { status: 400 })
   }
 
@@ -50,21 +61,28 @@ export async function POST(
     return NextResponse.json({ data: { order_id: order.id, status: 'confirmed' } })
   }
 
-  // Update order status
-  const { error } = await supabase
-    .from('orders')
+  const { error: paymentError } = await supabase
+    .from('payments')
     .update({
-      status:               'confirmed',
-      payment_status:       'paid',
       razorpay_payment_id,
-      paid_at:              new Date().toISOString(),
+      razorpay_signature,
+      status:      'captured',
+      captured_at: new Date().toISOString(),
     })
+    .eq('id', payment.id)
+
+  if (paymentError) return NextResponse.json({ error: 'Failed to record payment' }, { status: 500 })
+
+  const { error: orderErr } = await supabase
+    .from('orders')
+    .update({ status: 'confirmed', payment_status: 'paid' })
     .eq('id', order.id)
 
-  if (error) return NextResponse.json({ error: 'Failed to confirm order' }, { status: 500 })
+  if (orderErr) return NextResponse.json({ error: 'Failed to confirm order' }, { status: 500 })
 
-  // Clear cart
-  await supabase.from('cart_items').delete().eq('user_id', user.id)
+  // Clear the buyer's cart
+  const { data: cart } = await supabase.from('carts').select('id').eq('user_id', user.id).maybeSingle()
+  if (cart) await supabase.from('cart_items').delete().eq('cart_id', cart.id)
 
   return NextResponse.json({ data: { order_id: order.id, status: 'confirmed' } })
 }

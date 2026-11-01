@@ -8,7 +8,7 @@ async function getSellerStats(userId: string) {
 
   const { data: seller } = await supabase
     .from('seller_profiles')
-    .select('id, display_name, status, rating_avg, rating_count')
+    .select('id, display_name, is_active, kyc_status, total_rating, total_reviews')
     .eq('user_id', userId)
     .single()
 
@@ -21,27 +21,27 @@ async function getSellerStats(userId: string) {
     supabase
       .from('order_items')
       .select('id', { count: 'exact', head: true })
-      .eq('seller_profile_id', seller.id)
+      .eq('seller_id', seller.id)
       .gte('created_at', start),
 
     supabase
       .from('products')
       .select('id', { count: 'exact', head: true })
-      .eq('seller_profile_id', seller.id)
+      .eq('seller_id', seller.id)
       .eq('status', 'active'),
 
     supabase
       .from('order_items')
       .select('unit_price, quantity')
-      .eq('seller_profile_id', seller.id)
-      .eq('status', 'delivered')
+      .eq('seller_id', seller.id)
+      .eq('item_status', 'delivered')
       .gte('created_at', start),
 
     supabase
       .from('order_items')
       .select('id', { count: 'exact', head: true })
-      .eq('seller_profile_id', seller.id)
-      .eq('status', 'pending'),
+      .eq('seller_id', seller.id)
+      .eq('item_status', 'pending'),
   ])
 
   const revenue = (revenueRes.data ?? []).reduce(
@@ -101,8 +101,8 @@ export default async function SellerDashboardPage() {
     },
     {
       label: 'Avg. rating',
-      value: stats.seller.rating_avg != null
-        ? `${Number(stats.seller.rating_avg).toFixed(1)} ★`
+      value: stats.seller.total_reviews > 0
+        ? `${Number(stats.seller.total_rating).toFixed(1)} ★`
         : '—',
       icon: Star,
       color: 'text-amber-600',
@@ -119,7 +119,7 @@ export default async function SellerDashboardPage() {
         </p>
       </div>
 
-      {stats.seller.status !== 'active' && (
+      {(!stats.seller.is_active || stats.seller.kyc_status !== 'approved') && (
         <div className="flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <AlertCircle className="h-4 w-4 flex-none" />
           Your seller account is under review. Products will go live once approved.

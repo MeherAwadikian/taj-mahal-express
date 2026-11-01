@@ -44,7 +44,7 @@ const CATEGORIES = [
   { id: 'cat_toys',        label: 'Toys' },
 ]
 
-function FieldError({ message }: { message?: string }) {
+function FieldError({ message }: { message?: string | undefined }) {
   if (!message) return null
   return <p className="mt-1 text-xs text-destructive">{message}</p>
 }
